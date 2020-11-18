@@ -6,8 +6,10 @@ function va_run(debug)
 
 % 11/11/20 by Liwei Sun
 
-imouse = 10; % double check with GetMouseIndices
-possiblekn = 1:3;
+HideCursor;
+ntriggers = 31;
+imouse = 12; % double check with GetMouseIndices
+possiblekn = [1,3];
 
 clc;
 AssertOpenGL;
@@ -28,17 +30,17 @@ fprintf(outfile, ...
 
 % MR parameters
 tr = 0;
-pretr = 5; % wait 5 TRs for BOLD to be stable
+pretr = 5 * ntriggers; % wait 5 TRs for BOLD to be stable
 if debug
     BUFFER = [];
     fRead = @() ReadFakeTrigger;
     tr_tmr = timer('TimerFcn', @SetTrigger, 'Period', 2, ...
         'ExecutionMode', 'fixedDelay', 'Name', 'tr_timer');
 else
+    tbeginning = NaN;
     trigger = 57; %GE scanner with MR Technology Inc. trigger box
     IOPort('Closeall');
-    P4 = IOPort('OpenSerialPort', ...
-        '/dev/serial/by-path/pci-0000:05:00.3-usb-0:2:1.0', 'BaudRate=9600');
+    P4 = getport;
     fRead = @() ReadScanner;
 end
 
@@ -117,7 +119,10 @@ cues = [lcue, rcue, shortcue, longcue, neutralcue]; % see make_seq
 
 if debug
     start(tr_tmr)
+    tbeginning = GetSecs;
 end
+
+ncor = 0;
 
 TRWait(pretr);
 tstart = GetSecs;
@@ -186,13 +191,24 @@ for iblock = 1:nblocks
             iblock, itrial, dcue, dsoa, dtar, vtar, keypressed, rt, ...
             trial_onset-tstart, cue_onset-tstart, tar_onset-tstart, ...
             resp_onset-tstart);
+        
+        if (keypressed == 1 && dtar == 1) || (keypressed == 3 && dtar == 2)
+            ncor = ncor + 1;
+        elseif (vtar == 3 && keypressed == 1) || (vtar == 4 && keypressed == 3)
+            ncor = ncor + 1;
+        end
+            
         WaitSecs(tend-tcur);
     end
 end
 
+fprintf(outfile, '%s:\t %f\t %s:\t %f\t', 'TR1', tbeginning, 'Trial1', ...
+    tstart);
+
 PsychPortAudio('Close', pahandle);
 WaitSecs(6);
 fclose(outfile);
+ShowCursor;
 
 if debug
     StopTimer;
@@ -200,6 +216,7 @@ else
     IOPort('Closeall');
 end
 sca;
+disp(ncor/(nblocks * ntpb));
 
     function [data, when] = ReadScanner
         [data, when] = IOPort('Read', P4);

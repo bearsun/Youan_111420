@@ -5,8 +5,10 @@ function a_run(debug)
 
 % 11/11/20 by Liwei Sun
 
-imouse = 10; % double check with GetMouseIndices
-possiblekn = 1:3;
+HideCursor;
+ntriggers = 31;
+imouse = 12; % double check with GetMouseIndices
+possiblekn = [1,3];
 
 clc;
 AssertOpenGL;
@@ -27,17 +29,17 @@ fprintf(outfile, ...
 
 % MR parameters
 tr = 0;
-pretr = 5; % wait 5 TRs for BOLD to be stable
+pretr = 5 * ntriggers; % wait 5 TRs for BOLD to be stable
 if debug
     BUFFER = [];
     fRead = @() ReadFakeTrigger;
     tr_tmr = timer('TimerFcn', @SetTrigger, 'Period', 2, ...
         'ExecutionMode', 'fixedDelay', 'Name', 'tr_timer');
 else
+    tbeginning = NaN;
     trigger = 57; %GE scanner with MR Technology Inc. trigger box
     IOPort('Closeall');
-    P4 = IOPort('OpenSerialPort', ...
-        '/dev/serial/by-path/pci-0000:05:00.3-usb-0:2:1.0', 'BaudRate=9600');
+    P4 = getport;
     fRead = @() ReadScanner;
 end
 
@@ -94,7 +96,7 @@ img = imread('control_l.bmp') * 255;
 control_l = Screen('MakeTexture', mainwin, img);
 img = imread('control_r.bmp') * 255;
 control_r = Screen('MakeTexture', mainwin, img);
-img = imread('VA_bg.bmp') * 255;
+img = imread('AA_bg.bmp') * 255;
 bg = Screen('MakeTexture', mainwin, img);
 % img = imread('VA_l_target.bmp') * 255;
 % l_target = Screen('MakeTexture', mainwin, img);
@@ -102,22 +104,24 @@ bg = Screen('MakeTexture', mainwin, img);
 % r_target = Screen('MakeTexture', mainwin, img);
 vtars = [control_l, control_r]; % see make_seq
 
-img = imread('VA_lcue.bmp') * 255;
+img = imread('AA_lcue.bmp') * 255;
 lcue = Screen('MakeTexture', mainwin, img);
-img = imread('VA_rcue.bmp') * 255;
+img = imread('AA_rcue.bmp') * 255;
 rcue = Screen('MakeTexture', mainwin, img);
-img = imread('VA_long_cue.bmp') * 255;
+img = imread('AA_long_cue.bmp') * 255;
 longcue = Screen('MakeTexture', mainwin, img);
-img = imread('VA_short_cue.bmp') * 255;
+img = imread('AA_short_cue.bmp') * 255;
 shortcue = Screen('MakeTexture', mainwin, img);
-img = imread('VA_neutral_cue.bmp') *255;
+img = imread('AA_neutral_cue.bmp') *255;
 neutralcue = Screen('MakeTexture', mainwin, img);
 cues = [lcue, rcue, shortcue, longcue, neutralcue]; % see make_seq
 
 if debug
     start(tr_tmr)
+    tbeginning = GetSecs;
 end
 
+ncor = 0;
 TRWait(pretr);
 tstart = GetSecs;
 % exp start
@@ -184,21 +188,30 @@ for iblock = 1:nblocks
             iblock, itrial, dcue, dsoa, dtar, keypressed, rt, ...
             trial_onset-tstart, cue_onset-tstart, tar_onset-tstart, ...
             resp_onset-tstart);
+        
+        if (keypressed == 1 && dtar == 1) || (keypressed == 3 && dtar == 2)
+            ncor = ncor + 1;
+        elseif (dtar == 3 && keypressed == 1) || (dtar == 4 && keypressed == 3)
+            ncor = ncor + 1;
+        end
+        
         WaitSecs(tend-tcur);
     end
 end
 
+fprintf(outfile, '%s:\t %f\t %s:\t %f\t', 'TR1', tbeginning, 'Trial1', ...
+    tstart);
 PsychPortAudio('Close', pahandle);
 WaitSecs(6);
 fclose(outfile);
-
+ShowCursor;
 if debug
     StopTimer;
 else
     IOPort('Closeall');
 end
 sca;
-
+disp(ncor/(nblocks*ntpb));
     function [data, when] = ReadScanner
         [data, when] = IOPort('Read', P4);
         
