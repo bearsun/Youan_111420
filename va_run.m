@@ -191,8 +191,9 @@ for iblock = 1:nblocks
             iblock, itrial, dcue, dsoa, dtar, vtar, keypressed, rt, ...
             trial_onset-tstart, cue_onset-tstart, tar_onset-tstart, ...
             resp_onset-tstart);
-        
-        if (keypressed == 1 && dtar == 1) || (keypressed == 3 && dtar == 2)
+        if bcatch == 1 && isnan(keypressed)
+            ncor = ncor + 1;
+        elseif (keypressed == 1 && dtar == 1) || (keypressed == 3 && dtar == 2)
             ncor = ncor + 1;
         elseif (vtar == 3 && keypressed == 1) || (vtar == 4 && keypressed == 3)
             ncor = ncor + 1;
